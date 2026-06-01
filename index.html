@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Task Tracker — Daily To-Do Powered by Notion</title>
+  <meta name="description" content="A beautiful daily task tracker powered by Notion API." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Aurora background blobs -->
+  <div class="bg-blob blob-1"></div>
+  <div class="bg-blob blob-2"></div>
+  <div class="bg-blob blob-3"></div>
+
+  <div class="app-wrapper">
+    <div class="card">
+
+      <!-- Demo Banner -->
+      <div id="demo-banner" class="demo-banner" style="display:none">
+        🧪 <strong>Demo Mode</strong> — mock data active. Set <code>DEMO_MODE: false</code> in config.js to connect Notion.
+      </div>
+
+      <!-- ── Top Bar ── -->
+      <div class="top-bar">
+        <div class="top-bar-left">
+          <span class="app-icon">✦</span>
+          <span class="app-name">TaskFlow</span>
+          <span id="mode-badge" class="badge badge-today">Today</span>
+        </div>
+        <div class="top-bar-right">
+          <button id="theme-btn" class="icon-btn" title="Toggle light/dark mode" aria-label="Toggle theme">
+            <svg id="theme-icon-moon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
+            <svg id="theme-icon-sun"  width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          </button>
+          <button id="today-btn" class="pill-btn">↩ Today</button>
+          <button id="date-btn" class="date-chip" aria-label="Pick date">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span id="selected-date">—</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Custom Premium Calendar Modal ── -->
+      <div id="calendar-modal" class="calendar-modal" style="display:none">
+        <div class="calendar-backdrop" id="calendar-backdrop"></div>
+        <div class="calendar-card">
+          <div class="calendar-header">
+            <button id="cal-prev-btn" class="cal-nav-btn" aria-label="Previous month">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span id="cal-month-year" class="cal-month-year">June 2026</span>
+            <button id="cal-next-btn" class="cal-nav-btn" aria-label="Next month">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+          <div class="calendar-weekdays">
+            <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+          </div>
+          <div id="calendar-days" class="calendar-days">
+            <!-- Dynamically generated days -->
+          </div>
+          <div class="calendar-footer">
+            <button id="cal-today-btn" class="cal-footer-btn">Today</button>
+            <button id="cal-close-btn" class="cal-footer-btn secondary">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Date Hero ── -->
+      <div class="date-hero">
+        <div id="hero-day" class="hero-day">—</div>
+        <div id="hero-monthyear" class="hero-monthyear">—</div>
+      </div>
+
+      <!-- ── Progress Ring + Stats ── -->
+      <div class="progress-section">
+        <div class="ring-wrap">
+          <svg class="ring-svg" viewBox="0 0 120 120">
+            <circle class="ring-track" cx="60" cy="60" r="50"/>
+            <circle id="ring-fill" class="ring-fill" cx="60" cy="60" r="50"/>
+          </svg>
+          <div class="ring-center">
+            <span id="ring-pct" class="ring-pct">0%</span>
+            <span class="ring-label">done</span>
+          </div>
+        </div>
+        <div class="stats-col">
+          <div class="stat-card stat-total">
+            <span id="stat-total" class="stat-num">0</span>
+            <span class="stat-name">Total</span>
+          </div>
+          <div class="stat-card stat-done">
+            <span id="stat-done" class="stat-num">0</span>
+            <span class="stat-name">Done</span>
+          </div>
+          <div class="stat-card stat-left">
+            <span id="stat-left" class="stat-num">0</span>
+            <span class="stat-name">Left</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Daily Sleep Tracker ── -->
+      <div class="sleep-section">
+        <div class="section-label" style="margin-top: 10px;">
+          <span>Sleep Log</span>
+          <div class="divider-line"></div>
+          <span id="sleep-save-status" class="save-status"></span>
+        </div>
+        <div class="sleep-row">
+          <div class="sleep-picker-group">
+            <div class="sleep-input-chip">
+              <span class="sleep-chip-label">Bedtime</span>
+              <div class="sleep-time-wrap">
+                <span class="sleep-icon-emoji">🌙</span>
+                <input type="time" id="sleep-time-input" class="sleep-time-input" />
+              </div>
+            </div>
+            <div class="sleep-input-chip">
+              <span class="sleep-chip-label">Wake Up</span>
+              <div class="sleep-time-wrap">
+                <span class="sleep-icon-emoji">☀️</span>
+                <input type="time" id="wake-time-input" class="sleep-time-input" />
+              </div>
+            </div>
+          </div>
+          <div id="sleep-duration-card" class="sleep-duration-card">
+            <span class="duration-title">Rest Duration</span>
+            <div class="duration-value-wrap">
+              <span id="sleep-hours-val" class="duration-val">—</span>
+              <span class="duration-unit">hrs</span>
+            </div>
+            <span id="sleep-suggestion" class="duration-hint">Enter bedtime & wake up</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Divider ── -->
+      <div class="section-label">
+        <span>Tasks</span>
+        <div class="divider-line"></div>
+      </div>
+
+      <!-- ── Task List ── -->
+      <ul id="task-list" class="task-list" role="list">
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>Loading tasks…</p>
+        </div>
+      </ul>
+
+      <!-- ── Add Task ── -->
+      <div id="add-task-row" class="add-task-row" style="display:none">
+        <div class="input-wrap">
+          <span class="input-icon">+</span>
+          <input id="new-task-input" type="text" class="task-input"
+            placeholder="Add a new task…" maxlength="200" autocomplete="off" />
+        </div>
+        <button id="add-task-btn" class="add-btn">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+
+      <!-- ── Daily Notes ── -->
+      <div class="notes-section">
+        <div class="section-label" style="margin-top: 22px;">
+          <span>Daily Notes</span>
+          <div class="divider-line"></div>
+          <span id="notes-save-status" class="save-status"></span>
+        </div>
+        <div class="notes-wrap" id="notes-wrap">
+          <textarea
+            id="notes-textarea"
+            class="notes-textarea"
+            placeholder="Write anything about your day — thoughts, ideas, reflections…"
+            maxlength="2000"
+            spellcheck="true"
+          ></textarea>
+          <div class="notes-footer">
+            <span id="notes-char-count" class="char-count">0 / 2000</span>
+            <span id="notes-readonly-label" class="readonly-label" style="display:none">
+              🔒 View Only
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Daily Photo ── -->
+      <div class="photo-section">
+        <div class="section-label" style="margin-top: 22px;">
+          <span>Daily Photo</span>
+          <div class="divider-line"></div>
+          <span id="photo-status" class="save-status"></span>
+        </div>
+
+        <!-- Upload Zone (shown when no image) -->
+        <div id="photo-dropzone" class="photo-dropzone">
+          <input type="file" id="photo-input" accept="image/*" style="display:none" />
+          <div class="dropzone-inner">
+            <div class="dropzone-icon">
+              <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="3"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+            </div>
+            <p class="dropzone-title">Drop a photo here</p>
+            <p class="dropzone-sub">or <button id="photo-browse-btn" class="browse-link">browse</button> to upload</p>
+            <p class="dropzone-hint">JPG, PNG, WEBP · Auto-compressed if &gt; 5 MB</p>
+          </div>
+        </div>
+
+        <!-- Image Preview (shown when image exists) -->
+        <div id="photo-preview" class="photo-preview" style="display:none">
+          <img id="photo-img" class="preview-img" alt="Daily photo" />
+          <div class="preview-overlay">
+            <span id="photo-meta" class="photo-meta"></span>
+            <button id="photo-remove-btn" class="remove-btn" title="Remove photo">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Remove
+            </button>
+          </div>
+        </div>
+
+        <!-- View-only note for past dates -->
+        <p id="photo-no-image-past" class="no-image-past" style="display:none">
+          📷 No photo recorded for this day.
+        </p>
+      </div>
+
+    </div><!-- /.card -->
+  </div>
+
+  <script src="config.js"></script>
+  <script src="notion.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
