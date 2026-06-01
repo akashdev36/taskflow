@@ -32,7 +32,14 @@ const API = (() => {
 
   async function mockGetTasks(date) {
     await delay(450); // simulate network latency
-    return mockDB.filter((t) => t.date === date && !t._deleted);
+    const tasks = mockDB.filter((t) => t.date === date && t.text !== "__DAILY_LOG__" && !t._deleted);
+    const log = mockDB.find((t) => t.date === date && t.text === "__DAILY_LOG__");
+    const dailyLog = log ? {
+      notes: log.notes || "",
+      bedtime: log.bedtime || "",
+      wakeup: log.wakeup || "",
+    } : { notes: "", bedtime: "", wakeup: "" };
+    return { tasks, dailyLog };
   }
 
   async function mockSaveTask(date, text) {
@@ -90,12 +97,28 @@ const API = (() => {
       }
     );
 
-    return data.results.map((page) => ({
-      id: page.id,
-      text: page.properties.Task.title[0]?.plain_text ?? "",
-      done: page.properties.Done.checkbox,
-      date: page.properties.Date.date?.start ?? date,
-    }));
+    const tasks = [];
+    let dailyLog = { notes: "", bedtime: "", wakeup: "" };
+
+    for (const page of data.results) {
+      const title = page.properties.Task.title[0]?.plain_text ?? "";
+      if (title === "__DAILY_LOG__") {
+        dailyLog = {
+          notes: page.properties.Notes?.rich_text[0]?.plain_text ?? "",
+          bedtime: page.properties.Bedtime?.rich_text[0]?.plain_text ?? "",
+          wakeup: page.properties.WakeUp?.rich_text[0]?.plain_text ?? "",
+        };
+      } else {
+        tasks.push({
+          id: page.id,
+          text: title,
+          done: page.properties.Done.checkbox,
+          date: page.properties.Date.date?.start ?? date,
+        });
+      }
+    }
+
+    return { tasks, dailyLog };
   }
 
   async function saveTask(date, text) {
@@ -127,5 +150,55 @@ const API = (() => {
     await request(`/pages/${id}`, "PATCH", { archived: true });
   }
 
-  return { getTasks, saveTask, updateTask, deleteTask };
+  async function saveDailyLog(date, fields) {
+    if (CONFIG.DEMO_MODE) {
+      await delay(200);
+      let log = mockDB.find((t) => t.date === date && t.text === "__DAILY_LOG__");
+      if (!log) {
+        log = { id: mockId(), text: "__DAILY_LOG__", date, notes: "", bedtime: "", wakeup: "" };
+        mockDB.push(log);
+      }
+      if (fields.notes !== undefined) log.notes = fields.notes;
+      if (fields.bedtime !== undefined) log.bedtime = fields.bedtime;
+      if (fields.wakeup !== undefined) log.wakeup = fields.wakeup;
+      return log;
+    }
+
+    // 1. Query for the existing __DAILY_LOG__ page for this date
+    const data = await request(`/databases/${CONFIG.DB_ID}/query`, "POST", {
+      filter: {
+        and: [
+          { property: "Date", date: { equals: date } },
+          { property: "Task", title: { equals: "__DAILY_LOG__" } }
+        ]
+      }
+    });
+
+    const existingPage = data.results[0];
+
+    const properties = {};
+    if (fields.notes !== undefined) {
+      properties.Notes = { rich_text: [{ text: { content: fields.notes } }] };
+    }
+    if (fields.bedtime !== undefined) {
+      properties.Bedtime = { rich_text: [{ text: { content: fields.bedtime } }] };
+    }
+    if (fields.wakeup !== undefined) {
+      properties.WakeUp = { rich_text: [{ text: { content: fields.wakeup } }] };
+    }
+
+    if (existingPage) {
+      await request(`/pages/${existingPage.id}`, "PATCH", { properties });
+    } else {
+      properties.Task = { title: [{ text: { content: "__DAILY_LOG__" } }] };
+      properties.Date = { date: { start: date } };
+      properties.Done = { checkbox: false };
+      await request("/pages", "POST", {
+        parent: { database_id: CONFIG.DB_ID },
+        properties
+      });
+    }
+  }
+
+  return { getTasks, saveTask, updateTask, deleteTask, saveDailyLog };
 })();

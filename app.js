@@ -239,11 +239,12 @@ async function loadTasks(date) {
   document.getElementById("add-task-row").style.display = "none";
 
   try {
-    State.tasks = await API.getTasks(date);
+    const res = await API.getTasks(date);
+    State.tasks = res.tasks;
     renderTasks();
-    loadNotes(date);
+    loadNotes(date, res.dailyLog);
     loadPhoto(date);
-    loadSleep(date);
+    loadSleep(date, res.dailyLog);
   } catch (err) {
     document.getElementById("task-list").innerHTML = `
       <div class="error-state">
@@ -252,9 +253,9 @@ async function loadTasks(date) {
         <p class="error-detail">${escapeHtml(err.message)}</p>
         <button class="retry-btn" onclick="loadTasks('${date}')">Retry</button>
       </div>`;
-    loadNotes(date);
+    loadNotes(date, null);
     loadPhoto(date);
-    loadSleep(date);
+    loadSleep(date, null);
   } finally {
     State.loading = false;
   }
@@ -588,37 +589,48 @@ function initSleep() {
   const wakeInput  = document.getElementById("wake-time-input");
   const saveStatus = document.getElementById("sleep-save-status");
 
-  function saveValue(key, value) {
+  async function saveValue(field, value) {
     if (!isEditable(State.selectedDate)) return;
     
     saveStatus.textContent = "Saving…";
     saveStatus.classList.add("visible");
     
+    const key = field === "bedtime" ? sleepKey(State.selectedDate) : wakeKey(State.selectedDate);
     safeStorage.setItem(key, value);
     updateSleepCalculation();
     
+    try {
+      await API.saveDailyLog(State.selectedDate, { [field]: value });
+      saveStatus.textContent = "✓ Saved to Notion";
+    } catch (err) {
+      console.error(err);
+      saveStatus.textContent = "✓ Saved (Local)";
+    }
+    
     setTimeout(() => {
-      saveStatus.textContent = "✓ Saved";
-      setTimeout(() => saveStatus.classList.remove("visible"), 1500);
-    }, 400);
+      saveStatus.classList.remove("visible");
+    }, 1800);
   }
 
   sleepInput.addEventListener("change", () => {
-    saveValue(sleepKey(State.selectedDate), sleepInput.value);
+    saveValue("bedtime", sleepInput.value);
   });
 
   wakeInput.addEventListener("change", () => {
-    saveValue(wakeKey(State.selectedDate), wakeInput.value);
+    saveValue("wakeup", wakeInput.value);
   });
 }
 
-function loadSleep(date) {
+function loadSleep(date, dailyLog) {
   const sleepInput = document.getElementById("sleep-time-input");
   const wakeInput  = document.getElementById("wake-time-input");
   const editable   = isEditable(date);
 
-  const savedSleep = safeStorage.getItem(sleepKey(date)) || "";
-  const savedWake  = safeStorage.getItem(wakeKey(date)) || "";
+  const savedSleep = (dailyLog && dailyLog.bedtime) || safeStorage.getItem(sleepKey(date)) || "";
+  const savedWake  = (dailyLog && dailyLog.wakeup) || safeStorage.getItem(wakeKey(date)) || "";
+
+  if (savedSleep) safeStorage.setItem(sleepKey(date), savedSleep);
+  if (savedWake) safeStorage.setItem(wakeKey(date), savedWake);
 
   sleepInput.value = savedSleep;
   wakeInput.value  = savedWake;
@@ -683,15 +695,16 @@ function initNotes() {
   // nothing to set up globally — called per date load
 }
 
-function loadNotes(date) {
+function loadNotes(date, dailyLog) {
   const textarea   = document.getElementById("notes-textarea");
   const charCount  = document.getElementById("notes-char-count");
   const roLabel    = document.getElementById("notes-readonly-label");
   const saveStatus = document.getElementById("notes-save-status");
   const editable   = isEditable(date);
 
-  // Load saved note for this date
-  const saved = safeStorage.getItem(notesKey(date)) || "";
+  const saved = (dailyLog && dailyLog.notes) || safeStorage.getItem(notesKey(date)) || "";
+  if (saved) safeStorage.setItem(notesKey(date), saved);
+
   textarea.value = saved;
   updateCharCount(saved.length, charCount);
 
@@ -712,11 +725,19 @@ function loadNotes(date) {
       saveStatus.classList.add("visible");
 
       clearTimeout(_notesSaveTimer);
-      _notesSaveTimer = setTimeout(() => {
+      _notesSaveTimer = setTimeout(async () => {
         safeStorage.setItem(notesKey(date), fresh.value);
-        saveStatus.textContent = "✓ Saved";
+        
+        try {
+          await API.saveDailyLog(date, { notes: fresh.value });
+          saveStatus.textContent = "✓ Saved to Notion";
+        } catch (err) {
+          console.error(err);
+          saveStatus.textContent = "✓ Saved (Local)";
+        }
+        
         setTimeout(() => saveStatus.classList.remove("visible"), 1800);
-      }, 600);
+      }, 700);
     });
   }
 }
