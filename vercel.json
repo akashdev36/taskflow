@@ -1,8 +1,31 @@
 {
-  "rewrites": [
+  "version": 2,
+  "builds": [
     {
-      "source": "/api/notion/:path*",
-      "destination": "/api/notion"
+      "src": "api/notion.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "*.{html,css,js,png,jpg,ico,svg}",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/notion/(.*)",
+      "dest": "/api/notion.js"
+    },
+    {
+      "src": "/(.*\\.css)",
+      "dest": "/$1"
+    },
+    {
+      "src": "/(.*\\.js)",
+      "dest": "/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
     }
   ]
 }
