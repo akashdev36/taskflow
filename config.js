@@ -6,7 +6,7 @@
 const CONFIG = {
   // ── Set to true to test locally without Notion setup ──────
   // Switch to false after deploying to Vercel
-  DEMO_MODE: true,
+  DEMO_MODE: false,
 
   // 👇 After deploying to Vercel, replace with your Vercel URL:
   //    https://YOUR_PROJECT.vercel.app/api/notion
